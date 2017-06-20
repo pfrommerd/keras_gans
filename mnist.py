@@ -1,6 +1,8 @@
 import tensorflow as tf
 sess = tf.Session()
 
+import math
+
 from keras import backend as K
 K.set_session(sess)
 
@@ -25,7 +27,7 @@ initializer = keras.initializers.RandomUniform(minval=-0.05, maxval=0.05, seed=N
 # depending which one we are working on, different
 # layers are trainable
 
-g_h0 = Dense(8000, input_dim=10, activation="relu",
+g_h0 = Dense(8000, input_dim=13, activation="relu",
              kernel_initializer=initializer, name="gen_h0")
 g_h1 = Dense(8000, activation="relu",
              kernel_initializer=initializer, name="gen_h1")
@@ -95,6 +97,9 @@ discriminator_full.compile(optimizer='rmsprop', loss='categorical_crossentropy',
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 
+
+print(y_train.shape)
+
 # Process the data a bit
 x_train = x_train.astype('float32')
 x_test = x_test.astype('float32')
@@ -131,26 +136,51 @@ ALL_CATEGORIES = np.identity(10) # Will contain all possible categories to input
 ALL_CATEGORIES_AUG = np.hstack((ALL_CATEGORIES, np.zeros((ALL_CATEGORIES.shape[0], 1), dtype=ALL_CATEGORIES.dtype)))
 FAKE_CATEGORY = np.array([0,0,0,0,0,0,0,0,0,0,1])
 
+TRAIN_PARAMS = {
+    'batch_size': 256,
+    'epochs': 5
+}
+
 # Some data generators
 def fake_in_gen():
     while True:
-        for i in range(ALL_CATEGORIES.shape[0]):
-            yield ALL_CATEGORIES[i]
+        for category in ALL_CATEGORIES:
+            r = np.random.uniform(-math.sqrt(3), math.sqrt(3), 3)
+            yield np.concatenate([category, r])
 
 def fake_good_out_gen():
     while True:
-        for i in range(ALL_CATEGORIES_AUG.shape[0]):
-            yield ALL_CATEGORIES_AUG[i]
+        for category_aug in ALL_CATEGORIES_AUG:
+            yield category_aug
 
 def fake_bad_out_gen():
     while True:
         yield FAKE_CATEGORY
     
             
-from trainer import GANTrainer
+from gan import GANTrainer
+from trainer import ProgressBarCallback
+from trainer import make_chunks
         
 with sess.as_default():
+    progressbar = ProgressBarCallback()
+
     trainer = GANTrainer((fake_in_gen(), fake_good_out_gen(), fake_bad_out_gen()),
                          discriminator, generator,
-                         discriminator_full, generator_full)
-    trainer.train((x_train, y_train_aug))
+                         discriminator_full, generator_full,
+                         callbacks= [progressbar] )
+    trainer.train((x_train, y_train_aug), TRAIN_PARAMS)
+
+with sess.as_default():
+    print(discriminator.evaluate(x_test, y_test_aug))
+    # Generate some content
+    y = generator.predict(np.array(list(make_chunks(fake_in_gen(), 10))), batch_size=10)
+    y = y.reshape((10, 28, 28))
+
+    i = 0;
+    for result in y:
+        img = result * 255
+        im = Image.fromarray(img)
+        im = im.convert('RGB')
+        im.save("%d.jpeg" % i)
+        i = i + 1

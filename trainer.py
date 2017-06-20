@@ -1,17 +1,13 @@
-from kerasvis import DBLogger
-
 import itertools
-import numpy as np
 
-
-def _batches(num_batches, batch_size,
+def make_batches(num_batches, batch_size,
              real_x, real_y,
              fake_in, fake_good_out, fake_bad_out):
         for i in range(num_batches):
             yield ((next(real_x), next(real_y)),
                    (next(fake_in), next(fake_good_out), next(fake_bad_out)))
 
-def _chunks(iterable, size):
+def make_chunks(iterable, size):
     iterator = iter(iterable)
     for first in iterator:    # stops when iterator is depleted
         def chunk():          # construct generator for next chunk
@@ -20,10 +16,7 @@ def _chunks(iterable, size):
                 yield more    # yield more elements from the iterator
         yield chunk()         # in outer generator, yield next chunk
 
-class TrainerCallback:
-    def set_params(self, params):
-        self.params = params
-        
+class TrainerCallback:        
     def set_trainer(self, trainer):
         self.trainer = trainer
 
@@ -39,68 +32,58 @@ class TrainerCallback:
     def on_batch_end(self, batch):
         pass
 
-    def on_train_begin(self):
+    def on_train_begin(self, params):
         pass
 
     def on_train_end(self):
         pass
 
+class ProgressBarCallback(TrainerCallback):
+    def on_train_begin(self, params):
+        self.num_batches = params['num_batches']
+        self.num_epochs = params['epochs']
+        self.current_iteration = 0;
 
+    def on_epoch_begin(self, epoch):
+        pass
+
+    def on_epoch_end(self, epoch):
+        pass
+
+    def on_batch_begin(self, batch):
+        self.printProgressBar(self.current_iteration, self.num_batches * self.num_epochs)
+
+    def on_batch_end(self, batch):
+        self.current_iteration = self.current_iteration + 1
+        self.printProgressBar(self.current_iteration, self.num_batches * self.num_epochs)
+
+
+    def printProgressBar (self, iteration, total, prefix = '', suffix = '', decimals = 1,
+                      length = 100, empty = '-', fill = '█', lend='[', rend=']'):
+        """
+        Call in a loop to create terminal progress bar
+        @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        """
+        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = fill * filledLength + empty * (length - filledLength)
+        print('\r%s %s%s%s %s%% %s' % (prefix, lend, bar, rend, percent, suffix), end = '\r')
+        # Print New Line on Complete
+        if iteration == total: 
+            print()
+    
 class Trainer:
-    def train(self, train_data, batch_size=128, epochs=5):
+    def train(self, train_data, params):
         pass
     
     def train_iteration(self, batch):
         pass
 
     
-class GANTrainer(Trainer):
-    def __init__(self, data_generators,
-                 discriminator, generator, disc_full, gen_full, callbacks=()):
-        self.data_generators = data_generators
-        self.discriminator = discriminator
-        self.generator = generator
-        self.discriminator_full = disc_full
-        self.generator_full = gen_full
-
-        self.callbacks = callbacks
-
-    def train(self, train_data, batch_size=128, epochs=5):
-        map(lambda x: x.on_train_begin(), self.callbacks)
-        
-        # Train_data contains real_x, real_y
-        real_x = train_data[0]
-        real_y = train_data[1]
-
-        # Make batches
-        num_batches = int(real_x.shape[0] / batch_size)
-
-        for epoch in range(epochs):
-            batches = _batches(num_batches, batch_size,
-                               _chunks(real_x, batch_size),
-                               _chunks(real_y, batch_size),
-                               _chunks(self.data_generators[0], batch_size),
-                               _chunks(self.data_generators[1], batch_size),
-                               _chunks(self.data_generators[2], batch_size))
-            for batch in batches:
-                self.train_iteration(batch)
-        #self.discriminator.train_on_batch(real_x, real_y_aug)
-        
-        map(lambda x: x.on_train_end(), self.callbacks)
-        
-    def train_iteration(self, batch):
-        real_x = np.array(list(batch[0][0]))
-        real_y = np.array(list(batch[0][1]))
-        
-        fake_in = np.array(list(batch[1][0]))
-        fake_good_out = np.array(list(batch[1][1]))
-        fake_bad_out = np.array(list(batch[1][2]))
-
-        # Train the discriminator on the real x and real y
-        self.discriminator.train_on_batch(real_x, real_y)
-
-        # Train the generator in the generator-discriminator stack
-        self.generator_full.train_on_batch(fake_in, fake_good_out)
-
-        # Train the discriminator in the generator-discriminator stack
-        self.discriminator_full.train_on_batch(fake_in, fake_bad_out)
