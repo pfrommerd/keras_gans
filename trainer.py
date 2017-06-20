@@ -1,11 +1,11 @@
 import itertools
 
 def make_batches(num_batches, batch_size,
-             real_x, real_y,
-             fake_in, fake_good_out, fake_bad_out):
+             real_x,
+             fake_in, target_good, target_bad):
         for i in range(num_batches):
-            yield ((next(real_x), next(real_y)),
-                   (next(fake_in), next(fake_good_out), next(fake_bad_out)))
+            yield ((next(real_x), next(target_good)),
+                   (next(fake_in), next(target_good), next(target_bad)))
 
 def make_chunks(iterable, size):
     iterator = iter(iterable)
@@ -17,43 +17,34 @@ def make_chunks(iterable, size):
         yield chunk()         # in outer generator, yield next chunk
 
 class TrainerCallback:        
-    def set_trainer(self, trainer):
-        self.trainer = trainer
-
-    def on_epoch_begin(self, epoch):
+    def on_epoch_begin(self, epoch, logs=None):
         pass
 
-    def on_epoch_end(self, epoch):
+    def on_epoch_end(self, epoch, logs=None):
         pass
 
-    def on_batch_begin(self, batch):
+    def on_batch_begin(self, batch, logs=None):
         pass
 
-    def on_batch_end(self, batch):
+    def on_batch_end(self, batch, logs=None):
         pass
 
-    def on_train_begin(self, params):
+    def on_train_begin(self, params, logs=None):
         pass
 
-    def on_train_end(self):
+    def on_train_end(self, logs=None):
         pass
 
 class ProgressBarCallback(TrainerCallback):
-    def on_train_begin(self, params):
+    def on_train_begin(self, params, logs=None):
         self.num_batches = params['num_batches']
         self.num_epochs = params['epochs']
         self.current_iteration = 0;
 
-    def on_epoch_begin(self, epoch):
-        pass
-
-    def on_epoch_end(self, epoch):
-        pass
-
-    def on_batch_begin(self, batch):
+    def on_batch_begin(self, batch, logs=None):
         self.printProgressBar(self.current_iteration, self.num_batches * self.num_epochs)
 
-    def on_batch_end(self, batch):
+    def on_batch_end(self, batch, logs=None):
         self.current_iteration = self.current_iteration + 1
         self.printProgressBar(self.current_iteration, self.num_batches * self.num_epochs)
 
@@ -80,7 +71,7 @@ class ProgressBarCallback(TrainerCallback):
             print()
     
 class Trainer:
-    def train(self, train_data, params):
+    def train(self, train_data, test_data, params):
         pass
     
     def train_iteration(self, batch):

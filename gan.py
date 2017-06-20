@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 from trainer import Trainer
 from trainer import make_batches
@@ -19,14 +20,9 @@ class GANTrainer(Trainer):
 
     def train(self, train_data, params):
         
-        # Train_data contains real_x, real_y
-        real_x = train_data[0]
-        real_y = train_data[1]
-
         # Make batches
         batch_size = params['batch_size']
-        num_batches = int(real_x.shape[0] / batch_size)
-        num_batches = 5
+        num_batches = int(train_data.shape[0] / batch_size)
         params['num_batches'] = num_batches
         epochs = params['epochs']
 
@@ -34,16 +30,19 @@ class GANTrainer(Trainer):
 
         for epoch in range(epochs):
             for x in self.callbacks: x.on_epoch_begin(epoch)
-            batches = make_batches(num_batches, batch_size,
-                               make_chunks(real_x, batch_size),
-                               make_chunks(real_y, batch_size),
+            batches = list(make_batches(num_batches, batch_size,
+                               make_chunks(train_data, batch_size),
                                make_chunks(self.data_generators[0], batch_size),
                                make_chunks(self.data_generators[1], batch_size),
-                               make_chunks(self.data_generators[2], batch_size))
+                               make_chunks(self.data_generators[2], batch_size)))
+            random.shuffle(batches)
+            
             for batch in batches:
                 self.train_iteration(batch)
+
+            # Evaluate the model
+            
             for x in self.callbacks: x.on_epoch_end(epoch)
-        #self.discriminator.train_on_batch(real_x, real_y_aug)
         
         for x in self.callbacks: x.on_train_end()
 
@@ -69,3 +68,11 @@ class GANTrainer(Trainer):
         
         for x in self.callbacks: x.on_batch_end(batch)
 
+
+
+def GANLogger(TrainerCallback):
+    def __init__(self):
+        self.gen_logger = DBLogger(comment="Generator")
+        
+    def on_epoch_end(self, epoch, logs={}):
+        print(logs)
