@@ -137,7 +137,7 @@ ALL_CATEGORIES_AUG = np.hstack((ALL_CATEGORIES, np.zeros((ALL_CATEGORIES.shape[0
 FAKE_CATEGORY = np.array([0,0,0,0,0,0,0,0,0,0,1])
 
 TRAIN_PARAMS = {
-    'batch_size': 256,
+    'batch_size': 64,
     'epochs': 5
 }
 
@@ -171,14 +171,19 @@ with sess.as_default():
                          callbacks= [progressbar] )
     trainer.train((x_train, y_train_aug), TRAIN_PARAMS)
 
+print("Evaluating...")
+    
 with sess.as_default():
     print(discriminator.evaluate(x_test, y_test_aug))
+    print("Saving images")
     # Generate some content
-    y = generator.predict(np.array(list(make_chunks(fake_in_gen(), 10))), batch_size=10)
+    input = np.array(list(make_chunks(fake_in_gen(), 10)))
+    y = generator.predict(input, batch_size=10)
     y = y.reshape((10, 28, 28))
 
     i = 0;
     for result in y:
+        print("Saving image %d" % i)
         img = result * 255
         im = Image.fromarray(img)
         im = im.convert('RGB')
